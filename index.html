@@ -2,52 +2,119 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8">
-  <title>QR Scanner</title>
+  <title>قارئ QR JSON</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- مكتبة قراءة QR -->
   <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+      background: #f2f2f2;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    #reader {
+      width: 320px;
+      margin: auto;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    #result {
+      margin-top: 20px;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      text-align: left;
+      direction: ltr;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      font-size: 16px;
+    }
+  </style>
 </head>
 
-<body style="text-align:center;font-family:Arial">
+<body>
 
-<h2>📷 مسح QR Code</h2>
+<h2>📷 مسح QR Code (JSON)</h2>
 
-<div id="reader" style="width:300px;margin:auto;"></div>
-<div id="result" style="margin-top:20px;"></div>
+<div id="reader"></div>
+
+<button onclick="startScanner()">ابدأ المسح</button>
+
+<div id="result">ستظهر البيانات هنا...</div>
 
 <script>
+  let html5QrCode;
+
   function startScanner() {
-    const html5QrCode = new Html5Qrcode("reader");
+    html5QrCode = new Html5Qrcode("reader");
+
+    // إجبار استخدام الكاميرا الخلفية
+    const config = {
+      fps: 10,
+      qrbox: 250
+    };
 
     Html5Qrcode.getCameras().then(devices => {
-      if (devices && devices.length) {
-        const cameraId = devices[0].id;
-
-        html5QrCode.start(
-          cameraId,
-          { fps: 10, qrbox: 250 },
-          (decodedText) => {
-            try {
-              let data = JSON.parse(decodedText);
-              document.getElementById("result").innerHTML =
-                "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
-            } catch {
-              document.getElementById("result").innerHTML =
-                "❌ ليس JSON<br>" + decodedText;
-            }
-          }
-        );
+      if (!devices || devices.length === 0) {
+        document.getElementById("result").innerText = "لا توجد كاميرا";
+        return;
       }
+
+      // نحاول اختيار الكاميرا الخلفية
+      let cameraId = devices[0].id;
+
+      for (let device of devices) {
+        if (device.label.toLowerCase().includes("back") ||
+            device.label.toLowerCase().includes("environment")) {
+          cameraId = device.id;
+        }
+      }
+
+      html5QrCode.start(
+        cameraId,
+        config,
+        (decodedText) => {
+          try {
+            const json = JSON.parse(decodedText);
+            document.getElementById("result").innerHTML =
+              "<b>📦 البيانات المستخرجة:</b><br><pre>" +
+              JSON.stringify(json, null, 2) +
+              "</pre>";
+          } catch (e) {
+            document.getElementById("result").innerHTML =
+              "❌ البيانات ليست JSON:<br><br>" + decodedText;
+          }
+        },
+        (errorMessage) => {
+          // تجاهل الأخطاء المتكررة
+        }
+      );
+
     }).catch(err => {
-      document.getElementById("result").innerHTML =
-        "❌ لم يتم الوصول للكاميرا<br>" + err;
+      document.getElementById("result").innerText =
+        "❌ خطأ في تشغيل الكاميرا: " + err;
     });
   }
-
-  // مهم: يبدأ بعد تفاعل المستخدم (مطلوب في iPhone)
-  document.body.addEventListener("click", startScanner, { once: true });
 </script>
-
-<p>اضغط في أي مكان لبدء الكاميرا</p>
 
 </body>
 </html>
