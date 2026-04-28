@@ -5,7 +5,6 @@
   <title>قارئ QR JSON</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- مكتبة قراءة QR -->
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
@@ -28,6 +27,17 @@
       overflow: hidden;
     }
 
+    button {
+      margin: 10px 5px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
     #result {
       margin-top: 20px;
       background: white;
@@ -38,40 +48,28 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-
-    button {
-      margin-top: 15px;
-      padding: 10px 15px;
-      border: none;
-      border-radius: 8px;
-      background: #007bff;
-      color: white;
-      font-size: 16px;
-    }
   </style>
 </head>
 
 <body>
 
-<h2>📷 مسح QR Code (JSON)</h2>
+<h2>📷 قارئ QR Code (JSON)</h2>
 
 <div id="reader"></div>
 
-<button onclick="startScanner()">ابدأ المسح</button>
+<button onclick="startScanner()">▶️ تشغيل الكاميرا</button>
+<button onclick="switchCamera()">🔄 تبديل الكاميرا</button>
+<button onclick="stopScanner()">⛔ إيقاف</button>
 
 <div id="result">ستظهر البيانات هنا...</div>
 
 <script>
   let html5QrCode;
+  let cameras = [];
+  let currentCameraIndex = 0;
 
   function startScanner() {
     html5QrCode = new Html5Qrcode("reader");
-
-    // إجبار استخدام الكاميرا الخلفية
-    const config = {
-      fps: 10,
-      qrbox: 250
-    };
 
     Html5Qrcode.getCameras().then(devices => {
       if (!devices || devices.length === 0) {
@@ -79,40 +77,65 @@
         return;
       }
 
-      // نحاول اختيار الكاميرا الخلفية
-      let cameraId = devices[0].id;
+      cameras = devices;
 
-      for (let device of devices) {
-        if (device.label.toLowerCase().includes("back") ||
-            device.label.toLowerCase().includes("environment")) {
-          cameraId = device.id;
-        }
-      }
+      // افتراضي: الكاميرا الأولى
+      currentCameraIndex = 0;
 
-      html5QrCode.start(
-        cameraId,
-        config,
-        (decodedText) => {
-          try {
-            const json = JSON.parse(decodedText);
-            document.getElementById("result").innerHTML =
-              "<b>📦 البيانات المستخرجة:</b><br><pre>" +
-              JSON.stringify(json, null, 2) +
-              "</pre>";
-          } catch (e) {
-            document.getElementById("result").innerHTML =
-              "❌ البيانات ليست JSON:<br><br>" + decodedText;
-          }
-        },
-        (errorMessage) => {
-          // تجاهل الأخطاء المتكررة
-        }
-      );
-
+      startCamera(cameras[currentCameraIndex].id);
     }).catch(err => {
       document.getElementById("result").innerText =
-        "❌ خطأ في تشغيل الكاميرا: " + err;
+        "❌ خطأ في الوصول للكاميرا: " + err;
     });
+  }
+
+  function startCamera(cameraId) {
+    html5QrCode.start(
+      cameraId,
+      { fps: 10, qrbox: 250 },
+      (decodedText) => {
+        try {
+          const json = JSON.parse(decodedText);
+          document.getElementById("result").innerHTML =
+            "<b>📦 البيانات:</b><br><pre>" +
+            JSON.stringify(json, null, 2) +
+            "</pre>";
+        } catch {
+          document.getElementById("result").innerHTML =
+            "❌ ليست JSON:<br><br>" + decodedText;
+        }
+      }
+    ).catch(err => {
+      document.getElementById("result").innerText =
+        "❌ لا يمكن تشغيل الكاميرا: " + err;
+    });
+  }
+
+  function switchCamera() {
+    if (cameras.length < 2) {
+      alert("لا يوجد أكثر من كاميرا");
+      return;
+    }
+
+    // إيقاف الحالية
+    html5QrCode.stop().then(() => {
+
+      // الانتقال للكاميرا التالية
+      currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
+
+      startCamera(cameras[currentCameraIndex].id);
+
+    }).catch(err => {
+      console.log("خطأ في الإيقاف:", err);
+    });
+  }
+
+  function stopScanner() {
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+        document.getElementById("result").innerText = "⛔ تم إيقاف الكاميرا";
+      });
+    }
   }
 </script>
 
